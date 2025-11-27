@@ -188,7 +188,7 @@ O agente RAG opera sob regras estritas:
 
 | Categoria | Tecnologia | Versão/Modelo |
 |-----------|------------|---------------|
-| **Orquestração** | n8n | Self-hosted |
+| **Orquestração** | n8n | Cloud / Web |
 | **LLM Principal** | Google Gemini Pro | `models/gemini-pro-latest` |
 | **LLM Auxiliar** | Google Gemini Flash | `models/gemini-flash-latest` |
 | **Embeddings** | Google Gemini | `models/gemini-embedding-001` |
