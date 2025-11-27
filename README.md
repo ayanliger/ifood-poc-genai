@@ -48,7 +48,7 @@ Um assistente especializado que **obrigatoriamente** consulta a documentação o
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   ┌──────────┐    ┌──────────────┐    ┌────────────┐    ┌───────────────┐   │
-│   │  Manual  │───▶│ Google Drive │───▶│  Extract   │───▶│   Transform   │   │
+│   │  Manual  │──▶│ Google Drive │───▶│  Extract   │──▶│   Transform   │   │
 │   │ Trigger  │    │  Download    │    │    CSV     │    │  (JavaScript) │   │
 │   └──────────┘    └──────────────┘    └────────────┘    └───────┬───────┘   │
 │                                                                   │         │
@@ -64,7 +64,7 @@ Um assistente especializado que **obrigatoriamente** consulta a documentação o
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   ┌──────────┐    ┌──────────────────┐    ┌────────────┐                     │
-│   │   Chat   │───▶│ LLM Classificador│───▶│   Switch   │                     │
+│   │   Chat   │──▶│ LLM Classificador│───▶│   Switch   │                     │
 │   │  Trigger │    │  (Gemini Flash)  │    │  (Routing) │                     │
 │   └──────────┘    └──────────────────┘    └─────┬──────┘                     │
 │                                                 │                            │
