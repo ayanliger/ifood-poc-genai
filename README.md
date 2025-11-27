@@ -342,11 +342,6 @@ O agente RAG opera sob regras estritas:
 
 ---
 
-## 🎬 Demonstração
-
-> *"Desenvolvi uma POC de agente interno para decisões de reembolso/cancelamento com arquitetura RAG híbrida, usando n8n como orquestrador. O sistema combina classificação semântica via LLM com roteamento determinístico, preserva integridade semântica dos documentos na ingestão, e implementa protocolos anti-alucinação com fallback seguro. Testei cenários críticos incluindo detecção de risco de fraude e baixa confiança no retrieval."*
-
----
 
 ## 📝 Notas Finais
 
