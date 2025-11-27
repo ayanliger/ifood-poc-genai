@@ -1,0 +1,648 @@
+{
+  "name": "POC Sistema GenAI Híbrido para uso interno iFood -> Agente RAG + LLM Chain Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        48
+      ],
+      "id": "046417cd-3f49-4b5a-8101-aa759bba4f5f",
+      "name": "When chat message received",
+      "webhookId": "4091fa09-fb9a-4039-9411-7104d213f601"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f04deabd-4e5a-4048-b0f0-9632dcafa8b0",
+                    "leftValue": "={{ $json.text }}",
+                    "rightValue": "OPERACIONAL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "23d6889f-72bc-402e-8c1d-dfe350d69f8f",
+                    "leftValue": "={{ $json.text }}",
+                    "rightValue": "SAUDACAO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.text }}",
+                    "rightValue": "RISCO_FRAUDE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "d8fd304c-989a-4025-849e-d6cf9b54b148"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        336,
+        16
+      ],
+      "id": "65297b2d-7831-4419-9b93-db95464c5e8c",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "Olá, FoodLover! Sou o assistente virtual de suporte do iFood. Posso esclarecer dúvidas sobre regras de cancelamento e reembolso. Como posso te ajudar?"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        704,
+        48
+      ],
+      "id": "10e29798-d7d8-4631-bcbb-b5a14dd0a681",
+      "name": "Chain SAUDAÇÃO"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "=⚠️ **ORIENTAÇÃO DE SEGURANÇA**  Identifiquei que este cenário envolve possíveis riscos de fraude ou segurança (conforme Fluxo Segurança).  **Recomendação Oficial:** Para estes casos, a orientação é não prosseguir com a tratativa padrão de reembolso. Sugiro encaminhar o caso para análise especializada do time de **Prevention**.  **Próximos passos sugeridos:** 1. Validar se há histórico de múltiplos reembolsos ou comportamento atípico. 2. Se confirmado a suspeita, abrir ticket com a tag `#URGENTE` para avaliação manual."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        736,
+        192
+      ],
+      "id": "01038457-8edb-48b2-ae72-8ac6824e10cd",
+      "name": "Chain FRAUDE"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "Desculpe, sou um assistente especializado apenas nas Políticas e Processos Operacionais do iFood. Não fui treinado para responder sobre outros assuntos.  💡 Posso ajudar com:  Regras de Reembolso e Estorno  Procedimentos de Cancelamento  Fluxos de Entrega e Segurança  Por favor, tente reformular sua dúvida focando nestes temas."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        704,
+        336
+      ],
+      "id": "be75931c-d1e9-4f55-a339-c448d5c0464a",
+      "name": "Chain FALLBACK"
+    },
+    {
+      "parameters": {},
+      "id": "41e4d3e8-2556-4b32-9781-9df45e172845",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "delimiter": ",",
+          "encoding": "utf-8",
+          "headerRow": true
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        -560
+      ],
+      "id": "8aeb2b87-6f66-4800-961c-bb944386be1b",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "https://drive.google.com/file/d/154od-0dSzUt3wCDkeAMfNWtU9ZMKKRgx/view?usp=drive_link",
+          "mode": "url"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        672,
+        -560
+      ],
+      "id": "2f3919eb-8e32-475f-ab44-ddfcbbeaff24",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "o3eIH9opOp7JAosh",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const data = item.json;\n\n  // ESTRATÉGIA REFINADA:\n  // Colocamos a FONTE e a CATEGORIA no topo do texto.\n  // Mudamos os rótulos para \"CENÁRIO\" e \"AÇÃO\" para guiar o modelo.\n  const textContent = `[FONTE OFICIAL: ${data.fonte}]\n[CATEGORIA: ${data.categoria}]\nCENÁRIO: ${data.pergunta}\nAÇÃO RECOMENDADA: ${data.resposta}`;\n\n  return {\n    json: {\n      // Metadados (continuam aqui para filtros futuros)\n      categoria: data.categoria,\n      fonte: data.fonte,\n      \n      // O texto \"blindado\" para o vetor\n      text_to_embed: textContent\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        -560
+      ],
+      "id": "feb4c6c8-78ed-4229-a243-82df5a4b44f0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        -384
+      ],
+      "id": "3004e73e-57d5-4fcd-aa93-f7efba00b0c7",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=Você é um Especialista de Suporte Nível 2 do iFood, responsável por auxiliar atendentes humanos com dúvidas operacionais complexas.\n\nSUAS FERRAMENTAS:\nVocê tem acesso exclusivo à ferramenta \"Busca_Docs_iFood\".\nEla contém a \"Verdade Oficial\" sobre Reembolsos, Cancelamentos, Estornos e Entregas.\n\nPROTOCOLOS DE ATENDIMENTO:\n1. CONSULTA OBRIGATÓRIA: Para QUALQUER pergunta sobre regras, prazos ou procedimentos, você DEVE usar a ferramenta \"Busca_Docs_iFood\" primeiro. Nunca confie na sua memória interna para regras de negócio.\n2. CITAÇÃO DE FONTE: Ao responder, baseie-se estritamente no retorno da ferramenta. Se o documento trouxer \"[FONTE OFICIAL: Política X]\", cite essa fonte na sua resposta final.\n3. ORIENTAÇÃO À AÇÃO: Transforme a informação técnica em instrução clara.\n   - Ruim: \"O estorno pode levar 14 dias.\"\n   - Bom: \"Oriente o cliente a aguardar até 14 dias para o estorno constar na fatura.\"\n\nPROTOCOLO DE SEGURANÇA (CRÍTICO):\nAo receber o retorno da ferramenta \"Busca_Docs_iFood\", analise criticamente a relevância:\n1. Se o conteúdo recuperado NÃO responder diretamente à pergunta do usuário, ou se for vago/genérico demais:\n   - IGNORE o conteúdo.\n   - Responda EXATAMENTE esta frase: \"Desculpe, a busca na base de conhecimento não retornou informações com confiança suficiente para este cenário. Recomendo escalar para um supervisor.\"\n2. Não tente \"ajudar\" inferindo coisas que não estão escritas. Se não está na ferramenta, não existe.\n\nSEU OBJETIVO:\nFornecer respostas precisas, fundamentadas em documentos oficiais e prontas para serem repassadas ao cliente ou parceiro.",
+          "enableStreaming": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        864,
+        -288
+      ],
+      "id": "79208ee2-40d4-429c-a1af-b88033aa891f",
+      "name": "Agente RAG | OPERACIONAL"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Ferramenta de busca na Base de Conhecimento Oficial (Knowledge Base) do iFood. Utilize esta ferramenta para consultar regras e procedimentos sobre:\n\n> Reembolsos (Total, Parcial e Automático)\n\n> Cancelamentos (Pelo restaurante, cliente ou app)\n\n> Fluxos Financeiros e Estornos\n\n> Problemas na Entrega\n\nUse sempre que a dúvida envolver uma decisão operacional ou validação de política. A entrada (input) deve ser a pergunta completa do usuário.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "index-ifood-genai-reembolsos-cancelamentos",
+          "mode": "list",
+          "cachedResultName": "index-ifood-genai-reembolsos-cancelamentos"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        -96
+      ],
+      "id": "88e9fa81-8098-4d90-9542-cfc48b8008f1",
+      "name": "Busca Docs iFood",
+      "credentials": {
+        "pineconeApi": {
+          "id": "CGMYrZbQVqdu7Ax4",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        -96
+      ],
+      "id": "773503bf-850b-426c-a18e-290ce2980d2d",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "index-ifood-genai-reembolsos-cancelamentos",
+          "mode": "list",
+          "cachedResultName": "index-ifood-genai-reembolsos-cancelamentos"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1328,
+        -560
+      ],
+      "id": "31629b6f-1518-4802-8efc-fc100042a8d5",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "CGMYrZbQVqdu7Ax4",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-pro-latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        784,
+        -96
+      ],
+      "id": "f4d579e2-baa4-4388-a872-48d6d430cbde",
+      "name": "Google Gemini Pro",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jUMhOcPDSTr08QpJ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-flash-latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        336,
+        352
+      ],
+      "id": "e70c8c29-0ad0-4a7c-8f5d-264c220502ec",
+      "name": "Google Gemini Flash",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jUMhOcPDSTr08QpJ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "id": "fb389a38-a453-41b8-ada5-6fd92fe47620",
+      "name": "Gemini Embedding 1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        -288
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jUMhOcPDSTr08QpJ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "id": "ce961c93-f75d-40bf-bd01-3f6a8544157b",
+      "name": "Gemini Embedding 2",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        80
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jUMhOcPDSTr08QpJ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é o 'Gatekeeper' (Classificador) do Suporte a Parceiros.\nSua função é analisar a mensagem do usuário e categorizá-la em APENAS UMA das classes abaixo:\n\n1. SAUDACAO: Apenas cumprimentos (ex: \"Oi\", \"Bom dia\", \"Tudo bem?\").\n2. RISCO_FRAUDE: Menções a \"golpe\", \"cartão clonado\", \"múltiplos reembolsos\", \"bloqueio\", \"suspeita de fraude\" ou comportamento abusivo descrito no Fluxo de Segurança.\n3. OPERACIONAL: Dúvidas sobre Reembolso, Cancelamento, Entregas, Itens faltantes, Status de pedido, Estornos ou Regras da Política.\n4. OUTROS: Assuntos que não têm relação com a operação de delivery ou suporte.\n\nResponda APENAS com a palavra-chave da classe (ex: OPERACIONAL). Não explique nada, não use pontuação extra.\n\nMensagem do usuário: {{ $json.chatInput }}",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        -16,
+        48
+      ],
+      "id": "74f006eb-e547-4486-8b33-0d113e354250",
+      "name": "LLM Classificador"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "LLM Classificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Agente RAG | OPERACIONAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chain SAUDAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chain FRAUDE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chain FALLBACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Docs iFood": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente RAG | OPERACIONAL",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente RAG | OPERACIONAL",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        []
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Pro": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente RAG | OPERACIONAL",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Flash": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM Classificador",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Chain FRAUDE",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Chain SAUDAÇÃO",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Chain FALLBACK",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embedding 1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embedding 2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Busca Docs iFood",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente RAG | OPERACIONAL": {
+      "main": [
+        []
+      ]
+    },
+    "LLM Classificador": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "99950abb-75c2-4e27-92b2-db4ec1356e92",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "74538af137d450013c50edf5125aa520a4f702eb190c7807c780fc39afd40e9e"
+  },
+  "id": "KHD8y8tRrDntWn4q",
+  "tags": []
+}
