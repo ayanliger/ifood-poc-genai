@@ -1,8 +1,9 @@
 # 🍕 POC Sistema GenAI Híbrido — Agente RAG para Suporte Interno iFood
 
 > **Desafio Técnico:** Desafio opcional em GenAI — iFood  
-> **Candidato:** Ayan Liger
-> **Stack:** n8n + Google Gemini + Pinecone + RAG  
+> **Desenvolvedor:** Ayan Liger
+> **Stack:** n8n + Google Gemini + Pinecone + RAG
+> **YouTube Demo:** https://youtu.be/a4R-n1ONaNI
 
 ---
 
