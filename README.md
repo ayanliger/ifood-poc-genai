@@ -1,362 +1,78 @@
-# 🍔 POC: Sistema GenAI Híbrido para Suporte iFood
+# POC de suporte iFood com RAG
 
-![Status](https://img.shields.io/badge/Status-Conclu%C3%ADdo-success)
-![Stack](https://img.shields.io/badge/Stack-n8n%20%7C%20Gemini%20%7C%20Pinecone-blue)
+[![n8n](https://img.shields.io/badge/n8n-EA4B71?logo=n8n&logoColor=white)](https://docs.n8n.io/) [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)](poc_ifood_genAI.json) [![Gemini](https://img.shields.io/badge/Gemini-8E75B2?logo=googlegemini&logoColor=white)](https://ai.google.dev/gemini-api/docs) [![Licença MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-3DA639?logo=opensourceinitiative&logoColor=white)](LICENSE.md)
 
-> **Uma solução de Agentic RAG focada em segurança e eficiência.**
+Exercício de portfólio sobre suporte a reembolsos e cancelamentos, desenvolvido durante o processo seletivo para o Programa de Estágio em GenAI do iFood. A base de conhecimento é simulada e não representa políticas oficiais da empresa.
 
----
+O workflow combina classificação de mensagens por LLM com roteamento por regras no n8n. Dúvidas operacionais seguem para um agente RAG com busca no Pinecone; saudações, suspeitas de fraude e assuntos fora do escopo seguem para chains separadas.
 
-### 🔗 Acesso Rápido
-🎥 **Demo:** [Assista o vídeo](https://www.youtube.com/watch?v=a4R-n1ONaNI) <br>
-💻 **Repo:** [Veja o código](https://github.com/ayanliger/ifood-poc-genai) <br>
+[Demonstração em vídeo](https://www.youtube.com/watch?v=a4R-n1ONaNI).
 
----
+## Funcionamento
 
-## 📋 Sumário
+A ingestão é disparada manualmente: baixa-se o CSV do Google Drive, extraem-se as linhas e prepara-se o conteúdo para indexação. O chat consulta esse índice sem repetir a ingestão. O agente RAG também recebe contexto conversacional pelo nó `Simple Memory`.
 
-- [Visão Geral](#-visão-geral)
-- [Arquitetura do Sistema](#-arquitetura-do-sistema)
-- [Decisões Técnicas](#-decisões-técnicas)
-- [Componentes do Workflow](#-componentes-do-workflow)
-- [Stack Tecnológica](#-stack-tecnológica)
-- [Configuração e Deploy](#-configuração-e-deploy)
-- [Cenários de Teste](#-cenários-de-teste)
-- [Possíveis Evoluções](#-possíveis-evoluções)
+```mermaid
+flowchart TD
+    CSV["CSV no Google Drive"] --> Extracao["Extração das linhas"]
+    Extracao --> Transformacao["Transformação em JavaScript"]
+    Transformacao --> Vetores["Embeddings e índice Pinecone"]
 
----
-
-## 🎯 Visão Geral
-
-Esta POC implementa um **agente interno de suporte** para auxiliar colaboradores do iFood em decisões de **reembolsos e cancelamentos**. O sistema foi projetado com foco em:
-
-| Objetivo | Como é Alcançado |
-|----------|------------------|
-| **Consistência Operacional** | RAG consulta base de conhecimento oficial antes de responder |
-| **Anti-Alucinação** | Protocolo de segurança no system prompt + fallback para baixa confiança |
-| **Roteamento Inteligente** | Arquitetura híbrida: classificação semântica + roteamento determinístico |
-| **Escalabilidade** | Separação clara entre ingestão de dados e pipeline de chat |
-
-### O Problema
-
-Atendentes de suporte precisam consultar múltiplas políticas para tomar decisões. Respostas inconsistentes ou baseadas em "achismos" geram retrabalho, insatisfação e riscos operacionais.
-
-### A Solução
-
-Um assistente especializado que **obrigatoriamente** consulta a documentação oficial antes de responder, cita fontes, e encaminha casos de risco ou baixa confiança para tratamento manual.
-
----
-
-## 🏗 Arquitetura do Sistema
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         PIPELINE DE INGESTÃO (One-time)                     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   ┌──────────┐    ┌──────────────┐    ┌────────────┐    ┌───────────────┐   │
-│   │  Manual  │──▶│ Google Drive │───▶│  Extract   │──▶│   Transform   │   │
-│   │ Trigger  │    │  Download    │    │    CSV     │    │  (JavaScript) │   │
-│   └──────────┘    └──────────────┘    └────────────┘    └───────┬───────┘   │
-│                                                                   │         │
-│                                           ┌───────────────────────▼───────┐ │
-│                                           │   Pinecone Vector Store       │ │
-│                                           │   (Gemini Embeddings)         │ │
-│                                           └───────────────────────────────┘ │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                         PIPELINE DE CHAT (Runtime)                           │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   ┌──────────┐    ┌──────────────────┐    ┌────────────┐                     │
-│   │   Chat   │──▶│ LLM Classificador│───▶│   Switch   │                     │
-│   │  Trigger │    │  (Gemini Flash)  │    │  (Routing) │                     │
-│   └──────────┘    └──────────────────┘    └─────┬──────┘                     │
-│                                                 │                            │
-│                    ┌────────────────────────────┼────────────────────────┐   │
-│                    │                            │                        │   │
-│                    ▼                            ▼                        ▼   │
-│   ┌────────────────────────┐    ┌──────────────────────┐    ┌───────────────┐│
-│   │       OPERACIONAL      │    │       SAUDAÇÃO       │    │  RISCO_FRAUDE ││
-│   │  ┌──────────────────┐  │    │   Chain LLM simples  │    │ Chain + Alerta││
-│   │  │ Agente RAG       │  │    │  (resposta cordial)  │    │(encaminhamento││
-│   │  │ + Tool Pinecone  │  │    └──────────────────────┘    │ Prevention)   ││
-│   │  │ + Memory Buffer  │  │                                └───────────────┘│
-│   │  │ (Gemini Pro)     │  │                                                 │
-│   │  └──────────────────┘  │                  ┌───────────────────────────┐  │
-│   └────────────────────────┘                  │         FALLBACK          │  │
-│                                               │  (Query fora do escopo)   │  │
-│                                               └───────────────────────────┘  │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
+    Mensagem["Mensagem no chat"] --> Classificador["Classificador: Gemini Flash"]
+    Classificador --> Roteador["Switch"]
+    Roteador -->|OPERACIONAL| RAG["Agente RAG: Gemini Pro"]
+    Roteador -->|SAUDACAO| Saudacao["Chain de saudação"]
+    Roteador -->|RISCO_FRAUDE| Fraude["Chain de orientação para análise manual"]
+    Roteador -->|Sem correspondência| Fallback["Chain de fora do escopo"]
+    RAG -->|Busca| Vetores
+    Vetores -->|Documentos| RAG
 ```
 
----
+## Decisões técnicas
 
-## 🧠 Decisões Técnicas
+Utiliza-se o LLM para interpretar a intenção e o `Switch` para escolher o destino a partir do rótulo. Isso deixa as regras de encaminhamento inspecionáveis sem depender de uma decisão de tool calling para cada rota. No export, as regras usam `contains` sensível a maiúsculas para `OPERACIONAL`, `SAUDACAO` e `RISCO_FRAUDE`; uma saída sem correspondência, incluindo `OUTROS`, segue para o fallback. A classificação continua sujeita a erros do modelo.
 
-### 1. Roteamento Híbrido (LLM + Switch Determinístico)
+Na ingestão, o nó `Code in JavaScript` transforma cada linha do CSV em um registro com `text_to_embed`, `categoria` e `fonte`. O texto reúne fonte, categoria, cenário e ação recomendada para manter a regra e seu contexto juntos antes da indexação. O rótulo `FONTE OFICIAL` presente no template refere-se às fontes fictícias do exercício. Essa transformação preserva os campos para uso pelo document loader, mas não comprova por si só a qualidade da recuperação.
 
-**O problema:** Roteamento puramente por LLM pode ser inconsistente. Roteamento puramente por regras não entende contexto semântico.
+O system prompt instrui o agente a consultar a ferramenta de busca antes de responder sobre procedimentos, citar a fonte recuperada e recomendar um supervisor quando o conteúdo não sustentar a resposta. Consulta, citação e recusa são instruções ao modelo; o workflow não inclui uma validação determinística que imponha essas condições na resposta final.
 
-**A solução:** Um classificador LLM emite uma categoria (`OPERACIONAL`, `SAUDACAO`, `RISCO_FRAUDE`, `OUTROS`), e um Switch node determinístico roteia para o handler correto.
+Reserva-se o Gemini Pro para o agente com contexto recuperado. O Gemini Flash atende à classificação e às demais chains, enquanto os dois nós de embeddings usam o mesmo modelo para indexação e consulta. Ambos os modelos de chat estão configurados com `temperature: 0`; essa configuração não garante respostas idênticas entre execuções.
 
-```
-Entrada do Usuário  →  [LLM entende semântica]  →  [Switch garante consistência]  →  Handler
-```
+## Configuração
 
-**Benefícios:**
-- Entendimento semântico da intenção do usuário
-- Auditabilidade do roteamento (logs mostram categoria)
-- Comportamento previsível e testável
+Requer-se uma instância n8n com os nós de IA usados no [workflow exportado](poc_ifood_genAI.json), acesso à API Gemini, um índice Pinecone e acesso ao Google Drive. A versão do n8n utilizada na POC não está registrada no export.
 
-### 2. Transformação Customizada de Documentos
+1. Importe `poc_ifood_genAI.json` pela opção `Import from File` do n8n, conforme a [documentação de importação](https://docs.n8n.io/workflows/export-import/).
+2. Configure e associe as credenciais Gemini (`googlePalmApi`), Pinecone (`pineconeApi`) e Google Drive (`googleDriveOAuth2Api`) aos respectivos nós.
+3. Envie [base_conhecimento_ifood.csv](base_conhecimento_ifood.csv) ao seu Google Drive e substitua a URL no nó `Download file`. O export aponta para o arquivo usado na POC.
+4. Crie um índice Pinecone com 3.072 dimensões e métrica `cosine`, compatível com a saída padrão do [modelo de embeddings](https://ai.google.dev/gemini-api/docs/embeddings). Selecione o mesmo índice em `Pinecone Vector Store` e `Busca Docs iFood`. O nome registrado no export é `index-ifood-genai-reembolsos-cancelamentos`.
+5. Confira os modelos abaixo e sua disponibilidade na conta. Se alterar o modelo de embeddings ou a dimensão, ajuste o índice e gere novamente os vetores da base.
+6. Execute a ingestão pelo trigger manual e confira o conteúdo indexado, incluindo fonte, categoria, cenário e ação. Depois, teste as mensagens pelo Chat Trigger e examine a rota e as chamadas da ferramenta no histórico de execução.
 
-**O problema:** Text splitters padrão quebram CSVs em chunks arbitrários, misturando políticas diferentes e perdendo contexto.
+| Uso | Modelo registrado no export |
+|---|---|
+| Classificação, saudação, fraude e fora do escopo | `models/gemini-flash-latest` |
+| Agente RAG | `models/gemini-pro-latest` |
+| Indexação e busca vetorial | `models/gemini-embedding-001` |
 
-**A solução:** Transformação JavaScript que trata cada linha do CSV como um documento semântico completo:
+## Verificação manual
 
-```javascript
-const textContent = `[FONTE OFICIAL: ${data.fonte}]
-[CATEGORIA: ${data.categoria}]
-CENÁRIO: ${data.pergunta}
-AÇÃO RECOMENDADA: ${data.resposta}`;
-```
+Os casos abaixo descrevem o comportamento esperado, sem representar resultados de uma suíte automatizada. Na rota operacional, verifica-se a chamada da ferramenta e se a fonte citada sustenta a resposta.
 
-**Benefícios:**
-- Preserva integridade semântica de cada política
-- Metadados inline facilitam citação de fontes
-- Retrieval mais preciso (cada vetor = uma regra completa)
+| Mensagem | Comportamento esperado |
+|---|---|
+| "O cliente quer reembolso, mas o pedido já saiu para entrega. Pode?" | Rota `OPERACIONAL`, consulta à base e resposta apoiada na política simulada recuperada. |
+| "Esse cliente já pediu 5 reembolsos este mês, parece golpe" | Rota `RISCO_FRAUDE` e orientação para análise manual pelo time de Prevention. |
+| "Oi, tudo bem?" | Rota `SAUDACAO` e resposta de boas-vindas. |
+| "Qual a previsão do tempo pra amanhã?" | Classificação `OUTROS` e resposta de fora do escopo. |
+| "Qual o procedimento para casos de chargeback internacional?" | Consulta à base e recusa com recomendação de supervisor, pois o CSV não contém esse procedimento. |
 
-### 3. Protocolo Anti-Alucinação no System Prompt
+## Limitações
 
-O agente RAG opera sob regras estritas:
+O fluxo produz orientações no chat. Não há integração com APIs de pedidos, execução de reembolsos ou abertura de tickets; o encaminhamento para análise manual também ocorre apenas na resposta.
 
-```
-1. CONSULTA OBRIGATÓRIA: Para QUALQUER pergunta sobre regras, prazos ou procedimentos,
-   você DEVE usar a ferramenta "Busca_Docs_iFood" primeiro.
+O export registra aliases `latest` para os modelos de chat, sem fixar uma versão. A reprodução depende da disponibilidade desses aliases e da compatibilidade dos nós na instância n8n. Não há resultados quantitativos publicados de precisão, latência ou custo. Avaliar a recuperação, o cumprimento das instruções e as recusas exige um conjunto de perguntas com respostas de referência e inspeção das execuções.
 
-2. CITAÇÃO DE FONTE: Se o documento trouxer "[FONTE OFICIAL: Política X]",
-   cite essa fonte na sua resposta final.
+## Licença
 
-3. PROTOCOLO DE SEGURANÇA: Se o conteúdo recuperado NÃO responder diretamente
-   à pergunta, responda EXATAMENTE:
-   "Desculpe, a busca na base de conhecimento não retornou informações
-   com confiança suficiente para este cenário. Recomendo escalar para um supervisor."
-```
-
-### 4. Separação de Responsabilidades por Modelo
-
-|             Tarefa             |      Modelo      |         Justificativa           |
-|--------------------------------|------------------|---------------------------------|
-| Classificação + Chains simples |   Gemini Flash   | Baixa latência, custo reduzido  |
-|          Agente RAG            |    Gemini Pro    | Maior capacidade de raciocínio  |
-|          Embeddings            | Gemini Embedding | Consistência no espaço vetorial |
-
----
-
-## 🔧 Componentes do Workflow
-
-### Pipeline de Ingestão
-
-|            Nó           |                 Função                  |
-|-------------------------|-----------------------------------------|
-| `Manual Trigger`        | Disparo manual para atualização da base |
-| `Download file`         | Busca CSV do Google Drive               |
-| `Extract from File`     | Parse do CSV com headers                |
-| `Code in JavaScript`    | Transformação semântica dos documentos  |
-| `Pinecone Vector Store` | Indexação com Gemini Embeddings         |
-
-### Pipeline de Chat
-
-| Nó | Função |
-|----|--------|
-| `Chat Trigger` | Interface de chat embeddable |
-| `LLM Classificador` | Categorização da intenção (4 classes) |
-| `Switch` | Roteamento determinístico por categoria |
-| `Agente RAG \| OPERACIONAL` | Consulta base via tool + resposta fundamentada |
-| `Chain SAUDAÇÃO` | Resposta de boas-vindas |
-| `Chain FRAUDE` | Alerta de segurança + encaminhamento |
-| `Chain FALLBACK` | Mensagem de escopo limitado |
-
-### Sub-componentes do Agente RAG
-
-| Componente | Configuração |
-|------------|--------------|
-| `Google Gemini Pro` | temperature: 0 (determinismo) |
-| `Busca Docs iFood` | Tool mode, retrieval no Pinecone |
-| `Simple Memory` | Buffer de contexto conversacional |
-
----
-
-## 🛠 Stack Tecnológica
-
-| Categoria | Tecnologia | Versão/Modelo |
-|-----------|------------|---------------|
-| **Orquestração** | n8n | Cloud / Web |
-| **LLM Principal** | Google Gemini Pro | `models/gemini-pro-latest` |
-| **LLM Auxiliar** | Google Gemini Flash | `models/gemini-flash-latest` |
-| **Embeddings** | Google Gemini | `models/gemini-embedding-001` |
-| **Vector Store** | Pinecone | Index: `index-ifood-genai-reembolsos-cancelamentos` |
-| **Storage** | Google Drive | Base de conhecimento CSV |
-
----
-
-## ⚙ Configuração e Deploy
-
-### Pré-requisitos
-
-1. Instância n8n (local ou cloud)
-2. Conta Google Cloud com API Gemini habilitada
-3. Conta Pinecone (free tier suficiente)
-4. Base de conhecimento no Google Drive
-
-### Credenciais Necessárias
-
-| Serviço | Credencial n8n |
-|---------|----------------|
-| Google Gemini | `googlePalmApi` |
-| Pinecone | `pineconeApi` |
-| Google Drive | `googleDriveOAuth2Api` |
-
-### Passos de Deploy
-
-1. **Importar Workflow**
-   ```
-   n8n → Import → Upload JSON → poc_ifood_genAI.json
-   ```
-
-2. **Configurar Credenciais**
-   - Criar/vincular credenciais para cada serviço
-   - Testar conexões individualmente
-
-3. **Criar Index no Pinecone**
-   - Nome: `index-ifood-genai-reembolsos-cancelamentos`
-   - Dimensão: 3072 (compatível com gemini-embedding-001)
-   - Métrica: Cosine
-
-4. **Executar Ingestão**
-   - Clicar em "Execute Workflow" no trigger manual
-   - Verificar vetores no dashboard Pinecone
-
-5. **Ativar Chat**
-   - Ativar workflow
-   - Acessar URL do Chat Trigger para testar
-
----
-
-## 🧪 Cenários de Teste
-
-### Cenário 1: Consulta Operacional Padrão
-
-**Input:**
-> "O cliente quer reembolso, mas o pedido já saiu para entrega. Pode?"
-
-**Comportamento Esperado:**
-- Classificador emite: `OPERACIONAL`
-- Agente RAG consulta Pinecone
-- Resposta cita fonte oficial e diferencia cenários
-
----
-
-### Cenário 2: Detecção de Risco
-
-**Input:**
-> "Esse cliente já pediu 5 reembolsos este mês, parece golpe"
-
-**Comportamento Esperado:**
-- Classificador emite: `RISCO_FRAUDE`
-- Chain de Fraude ativada
-- Orientação para encaminhar ao time de Prevention
-
----
-
-### Cenário 3: Saudação
-
-**Input:**
-> "Oi, tudo bem?"
-
-**Comportamento Esperado:**
-- Classificador emite: `SAUDACAO`
-- Chain de boas-vindas responde cordialmente
-
----
-
-### Cenário 4: Fora do Escopo
-
-**Input:**
-> "Qual a previsão do tempo pra amanhã?"
-
-**Comportamento Esperado:**
-- Classificador emite: `OUTROS`
-- Fallback explica escopo do assistente
-
----
-
-### Cenário 5: Baixa Confiança
-
-**Input:**
-> "Qual o procedimento para casos de chargeback internacional?"
-
-**Comportamento Esperado:**
-- Agente RAG busca, não encontra match confiável
-- Protocolo de segurança ativado
-- Resposta: "Recomendo escalar para um supervisor"
-
----
-
-## 🚀 Possíveis Evoluções
-
-| Evolução | Descrição |
-|----------|-----------|
-| **Logs de Confiança** | Expor score de similaridade do retrieval na resposta |
-| **Feedback Loop** | Thumbs up/down para refinamento contínuo |
-| **Multi-tenant** | Namespaces Pinecone por equipe/região |
-| **Integração APIs** | Consulta real de status de pedido/estorno |
-| **Observabilidade** | Integração com LangSmith ou similar para traces |
-| **Guardrails** | Camada adicional de validação de outputs |
-
----
-
-## 📊 Métricas de Sucesso (Sugestão para possível implementação futura)
-
-| Métrica | Descrição | Meta |
-|---------|-----------|------|
-| **Accuracy** | % respostas corretas vs. gabarito | > 85% |
-| **Fallback Rate** | % ativações do protocolo de segurança | 5-15% |
-| **Latência P95** | Tempo de resposta | < 10s |
-| **Cobertura** | % perguntas respondidas sem escalação | > 80% |
-
----
-
-## 📁 Arquivos do Projeto
-
-```
-📦 poc-ifood-genai/
-├── 📄 poc_ifood_genAI.json          # Workflow n8n exportado
-├── 📄 base_conhecimento_ifood.csv   # Base de conhecimento (simulada)
-└── 📄 README.md                     # Este documento
-```
-
----
-
-
-## 📝 Notas Finais
-
-Este projeto foi desenvolvido como um projeto opcional proposto por um desafio simulado do iFood para portfolio pessoal durante o processo seletivo para o **Programa de Estágio em GenAI do iFood**. A base de conhecimento utilizada é simulada e não representa políticas oficiais da empresa.
-
-O foco foi demonstrar competência em:
-- Arquitetura de sistemas GenAI
-- Decisões técnicas fundamentadas
-- Implementação prática com ferramentas modernas
-- Pensamento crítico sobre edge cases e segurança
-
----
-
-<div align="center">
-
-**Desenvolvido com 🧠 e ☕ para o Desafio GenAI iFood**
-
-</div>
+[MIT](LICENSE.md).
